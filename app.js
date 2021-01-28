@@ -1,10 +1,10 @@
 const express = require("express");
 const app = express(); //initialize express
+const jwt = require('jsonwebtoken');
 const bcrypt = require("bcryptjs"); //library to hash passwords
 const bodyParser = require("body-parser"); //body parsing middleware
 const cookieParser = require("cookie-parser"); //to parse cookies
 const nodemailer = require("nodemailer"); //Send e-mails
-const cors = require("cors"); //middleware that can be used to enable CORS with various options
 const mongodb = require("mongodb"); //MongoDB driver
 const mongoClient = mongodb.MongoClient;
 require('dotenv').config()
@@ -13,7 +13,7 @@ const saltRounds = 10; //cost factor (controls how much time is needed to calcul
 app.use(cookieParser());
 app.use(bodyParser.json());
 
-const url = process.env.MONGODB_URL;
+const url = "mongodb+srv://satyaprasadbehara:Fdwe6cYnwFMERYMC@cluster0.efor9.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority";
 
 mongoClient.connect(
     url, {
@@ -31,8 +31,8 @@ mongoClient.connect(
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: process.env.GMAILUSER,
-        pass: process.env.GMAILPASS,
+        user: "mockmail4me@gmail.com",
+        pass: "dnvoerscnkohtwew",
     },
 });
 
@@ -53,7 +53,7 @@ app.post("/register", async (req, res) => {
         useNewUrlParser: true,
         useUnifiedTopology: true,
     }); //connect to db
-    let db = client.db("crm"); //db name
+    let db = client.db("CustomerRelationshipManagement"); //db name
     let user = db.collection("users"); //collection name
     user.findOne({
             email: email,
@@ -82,14 +82,14 @@ app.post("/register", async (req, res) => {
                             verified: false,
                         },
                         (err, result) => {
+                            if(err) console.log(err)
                             if (result) {
                                 let emailToken = jwt.sign({
                                         exp: Math.floor(Date.now() / 1000) + 60 * 60,
                                         email: email,
                                     },
-                                    process.env.JWT_SECRET
+                                    "abigsecret"
                                 );
-
                                 let Tokenurl = `https://crmserver.herokuapp.com/auth/${emailToken}`;
                                 let name = fname + " " + lname;
                                 //email template for sending token
@@ -104,7 +104,7 @@ app.post("/register", async (req, res) => {
                                         console.log(error);
                                     } else {
                                         return res.json({
-                                            message: "Check your mail and Confirm Identity...",
+                                            message: "Registration successful...please Check your mail and Confirm Identity...",
                                         }); //* if mail sent send this msg
                                     }
                                 });
@@ -130,7 +130,7 @@ app.post("/ResetPassword", async (req, res) => {
         useNewUrlParser: true,
         useUnifiedTopology: true,
     }); //connect to db
-    let db = client.db("crm"); //db name
+    let db = client.db("CustomerRelationshipManagement"); //db name
     let user = db.collection("users"); //collection name
     user.findOne({
             //find if the email exist in the collection
@@ -147,7 +147,7 @@ app.post("/ResetPassword", async (req, res) => {
                 let emailToken = jwt.sign({
                         email: email,
                     },
-                    process.env.JWT_SECRET, {
+                    "abigsecret", {
                         expiresIn: "10m",
                     }
                 );
@@ -155,7 +155,7 @@ app.post("/ResetPassword", async (req, res) => {
                     email: email,
                 }, {
                     $set: {
-                        confirmed: false,
+                        verified: false,
                     },
                 });
                 let Tokenurl = `https://crmserver.herokuapp.com/auth/${emailToken}`;
@@ -218,7 +218,7 @@ app.post("/login", async (req, res) => {
             } else {
                 let usertype = User.userType;
                 let name = User.fname + " " + User.lname;
-                if (User.confirmed == true) {
+                if (User.verified == true) {
                     bcrypt.compare(password, User.password, function (err, result) {
                         //* if found compare the & check passworded match or not
                         if (err) {
@@ -231,7 +231,7 @@ app.post("/login", async (req, res) => {
                             let token = jwt.sign({
                                     email: email,
                                 },
-                                process.env.JWT_SECRET, {
+                                "abigsecret", {
                                     expiresIn: "1h",
                                 }
                             ); //*assign a token
@@ -262,7 +262,7 @@ app.post("/login", async (req, res) => {
                     });
                 } else {
                     return res.json({
-                        message: "User Identity not Confirmed..",
+                        message: "User Identity not verified..",
                     });
                 }
             }
@@ -280,7 +280,7 @@ app.post("/NewPassword", async (req, res) => {
         useNewUrlParser: true,
         useUnifiedTopology: true,
     }); //connect to db
-    let db = client.db("crm"); //db name
+    let db = client.db("CustomerRelationshipManagement"); //db name
     let user = db.collection("users"); //collection name
     user.findOne({
             email: email,
@@ -291,7 +291,7 @@ app.post("/NewPassword", async (req, res) => {
                     message: "No User found with " + email + " !!",
                 }); //! if not found send this status
             } else {
-                let token = User.confirmed; //find if the token exists in the collection
+                let token = User.verified; //find if the token exists in the collection
                 if (token == true) {
                     try {
                         bcrypt.hash(password, saltRounds, function (err, hash) {
@@ -308,7 +308,7 @@ app.post("/NewPassword", async (req, res) => {
                             email: email,
                         }, {
                             $set: {
-                                confirmed: false,
+                                verified: false,
                             },
                         });
                         return res.json({

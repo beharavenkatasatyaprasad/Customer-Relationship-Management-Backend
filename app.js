@@ -1,15 +1,15 @@
 const express = require("express");
 const app = express(); //initialize express
 const bcrypt = require("bcryptjs"); //library to hash passwords
-const saltRounds = 10; //cost factor (controls how much time is needed to calculate a single BCrypt hash)
 const bodyParser = require("body-parser"); //body parsing middleware
 const cookieParser = require("cookie-parser"); //to parse cookies
 const nodemailer = require("nodemailer"); //Send e-mails
 const cors = require("cors"); //middleware that can be used to enable CORS with various options
 const mongodb = require("mongodb"); //MongoDB driver
 const mongoClient = mongodb.MongoClient;
+require('dotenv').config()
+const saltRounds = 10; //cost factor (controls how much time is needed to calculate a single BCrypt hash)
 
-require("dotenv").config();
 app.use(cookieParser());
 app.use(bodyParser.json());
 

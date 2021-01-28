@@ -28,6 +28,15 @@ mongoClient.connect(
   }
 );
 
+//credentials for mail transport
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.GMAILUSER,
+        pass: process.env.GMAILPASS
+    }
+});
+
 //index Endpoint for server
 app.get("/", (req, res) => {
   res.send("Hello From Server");
@@ -123,7 +132,6 @@ app.post("/resetpassword", async (req, res) => {
         }
         if (err) {
             return res.json({
-                type_: "danger",
                 message: err
             }); //! if found any error send this status
         }

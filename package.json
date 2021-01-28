@@ -1,0 +1,33 @@
+{
+  "name": "customer-relationship-management-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beharavenkatasatyaprasad/Customer-Relationship-Management-Backend.git"
+  },
+  "author": "Satya Prasad Behara",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/beharavenkatasatyaprasad/Customer-Relationship-Management-Backend/issues"
+  },
+  "homepage": "https://github.com/beharavenkatasatyaprasad/Customer-Relationship-Management-Backend#readme",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.19.0",
+    "cookie-parser": "^1.4.5",
+    "cors": "^2.8.5",
+    "dotenv": "^8.2.0",
+    "jsonwebtoken": "^8.5.1",
+    "mongodb": "^3.6.3",
+    "nodemailer": "^6.4.17"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.7"
+  }
+}

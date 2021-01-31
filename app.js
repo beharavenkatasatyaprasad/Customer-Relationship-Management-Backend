@@ -1,14 +1,17 @@
 const express = require("express");
 const app = express(); //initialize express
-const jwt = require('jsonwebtoken');
 const bcrypt = require("bcryptjs"); //library to hash passwords
 const bodyParser = require("body-parser"); //body parsing middleware
 const cookieParser = require("cookie-parser"); //to parse cookies
 const nodemailer = require("nodemailer"); //Send e-mails
 const mongodb = require("mongodb"); //MongoDB driver
+const {
+    EncodeToken
+} = require("./services/jwt")
+const jwt = require("jsonwebtoken")
 const mongoClient = mongodb.MongoClient;
 require('dotenv').config()
-const saltRounds = 10; //cost factor (controls how much time is needed to calculate a single BCrypt hash)
+let saltRounds = 10;
 
 app.use(cookieParser());
 app.use(bodyParser.json());
@@ -56,15 +59,15 @@ app.post("/register", async (req, res) => {
     if (!lname) {
         errors.push('lname field is required !!')
     }
-    if(!password){
+    if (!password) {
         errors.push('password field is required !!')
     }
     if (userType !== 'admin' && userType !== 'employee' && userType !== 'manager') {
 
         (!userType) ? errors.push('userType field is required !!'): errors.push(userType + ' is not a valid user type !!')
 
-    } 
-    if(errors.length === 0){
+    }
+    if (errors.length === 0) {
         let client = await mongoClient.connect(url, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
@@ -101,12 +104,7 @@ app.post("/register", async (req, res) => {
                             (err, result) => {
                                 if (err) console.log(err)
                                 if (result) {
-                                    let emailToken = jwt.sign({
-                                            exp: Math.floor(Date.now() / 1000) + 60 * 60,
-                                            email: email,
-                                        },
-                                        "abigsecret"
-                                    );
+                                    let emailToken = encodeToken(email)
                                     let Tokenurl = `http://localhost:3000/auth/${emailToken}`;
                                     let name = fname + " " + lname;
                                     //email template for sending token
@@ -136,9 +134,10 @@ app.post("/register", async (req, res) => {
                 }
             }
         );
-    }
-    else {
-        return res.json({ error: errors });
+    } else {
+        return res.json({
+            error: errors
+        });
     }
 });
 
@@ -226,13 +225,8 @@ app.post("/login", async (req, res) => {
                             }
                             if (result == true) {
                                 //if matched
-                                let token = jwt.sign({
-                                        email: email,
-                                    },
-                                    "abigsecret", {
-                                        expiresIn: "1h",
-                                    }
-                                ); //*assign a token
+                                let token = EncodeToken(email)
+
                                 res
                                     .cookie("jwt", token, {
                                         maxAge: 1000000,
@@ -300,13 +294,7 @@ app.post("/ResetPassword", async (req, res) => {
                     }); //! if not found send this status
                 } else {
                     //if found
-                    let emailToken = jwt.sign({
-                            email: email,
-                        },
-                        "abigsecret", {
-                            expiresIn: "10m",
-                        }
-                    );
+                    let emailToken = encodeToken(email);
                     user.findOneAndUpdate({
                         email: email,
                     }, {

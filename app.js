@@ -25,7 +25,7 @@ mongoClient.connect(
 
 app.use('/admin', accessToAdmin, accessToManager, accessToEmployee);
 app.use('/manager', accessToManager, accessToEmployee);
-app.use('/user', accessToEmployee);
+app.use('/employee', accessToEmployee);
 
 let port = process.env.PORT || 3000;
 

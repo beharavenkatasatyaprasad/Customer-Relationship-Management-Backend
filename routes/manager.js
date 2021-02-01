@@ -23,102 +23,97 @@ const transporter = nodemailer.createTransport({
 });
 
 router.route("/login").post(async (req, res) => {
-    const {
-        email,
-        password
-    } = req.body;
+    const { email, password } = req.body;
     let errors = [];
     if (!email) {
-        errors.push("email field is required !!");
+      errors.push("email field is required !!");
     }
     if (!password) {
-        errors.push("password field is required !!");
+      errors.push("password field is required !!");
     }
-    try {
-        let client = await mongoClient.connect(url, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        }); //connect to db
-        let db = client.db("CustomerRelationshipManagement"); //db name
-        let user = db.collection("users"); //collection name
-        user.findOne({
-                email: email,
-            },
-            (err, User) => {
-                if (err) {
-                    return res.json({
-                        error: "something went wrong",
+    if (errors.length === 0) {
+      let client = await mongoClient.connect(url, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      }); //connect to db
+      let db = client.db("CustomerRelationshipManagement"); //db name
+      let user = db.collection("users"); //collection name
+      await user.findOne(
+        {
+          email: email,
+        },
+        async(err, User) => {
+          if (err) {
+            console.log(err);
+            return res.json({
+              error: err,
+            });
+          }
+          if (User === null) {
+            return res.json({
+              error: `No registered user found with ${email}`,
+            });
+          } else if (User.userType !== "manager") {
+            return res.json({
+              error:
+                User.userType +
+                "  will not have permission to access manager portal",
+            });
+          } else {
+            if (User === null) {
+              return res.json({
+                message: "No registered user found with " + email,
+              });
+            } else {
+              let usertype = User.userType;
+              let name = User.fname + " " + User.lname;
+              if (User.verified === true) {
+                let passwordMatched = await bcrypt.compare(password, User.password);
+                if (passwordMatched == true) {
+                  //if matched
+                  let token = EncodeToken(email);
+                  res
+                    .cookie("jwt", token, {
+                      maxAge: 1000000,
+                      // httpOnly: true,
+                      // secure: true,
+                    })
+                    .cookie("userType", usertype, {
+                      maxAge: 1000000,
+                      // httpOnly: true,
+                      // secure: true,
+                    })
+                    .cookie("user", User._id, {
+                      maxAge: 1000000,
+                      // httpOnly: true,
+                      // secure: true,
+                    })
+                    .json({
+                      message:
+                        "Hello " + name + " , you are successfully logged in...", //if credentials matched,
                     });
-                }
-                if (User === null) {
-                    errors.push("No registered user found with " + email);
-                } else if (User.userType !== "admin") {
-                    errors.push(User.userType + "  will not have permission to access admin portal");
-                }
-                if (errors.length === 0) {
-                    if (User === null) {
-                        return res.json({
-                            message: "No registered user found with " + email,
-                        });
-                    } else {
-                        let usertype = User.userType;
-                        let name = User.fname + " " + User.lname;
-                        if (User.verified == true) {
-                            let passwordMatched = bcrypt.compare(
-                                password,
-                                User.password,
-                                result.password
-                            );
-                            if (passwordMatched == true) {
-                                //if matched
-                                let token = EncodeToken(email);
-                                res
-                                    .cookie("jwt", token, {
-                                        maxAge: 1000000,
-                                        // httpOnly: true,
-                                        // secure: true,
-                                    })
-                                    .cookie("userType", usertype, {
-                                        maxAge: 1000000,
-                                        // httpOnly: true,
-                                        // secure: true,
-                                    })
-                                    .cookie("user", email, {
-                                        maxAge: 1000000,
-                                        // httpOnly: true,
-                                        // secure: true,
-                                    })
-                                    .json({
-                                        message: "Hello " + name + " , you are successfully logged in...", //if credentials matched,
-                                    });
-                            } else {
-                                return res.json({
-                                    error: "Invalid Credentials..", //if the credentials were not matching
-                                });
-                            }
-                        } else {
-                            return res.json({
-                                error: "User Identity not verified..",
-                            });
-                        }
-                    }
                 } else {
-                    return res.json({
-                        error: errors,
-                    });
+                  return res.json({
+                    error: "Invalid Credentials..", //if the credentials were not matching
+                  });
                 }
+              } else {
+                return res.json({
+                  error: "User Identity not verified..",
+                });
+              }
             }
-        );
-        client.close()
-    } catch (err) {
-        console.log(err)
-        return res.json({
-            error: 'something went wrong'
-        });
+          }
+        }
+      );
+    } else {
+      return res.json({
+        error: errors,
+      });
     }
-});
+  });
 
-router.route("/RegisterUser").post(async (req, res) => {
+router.route("/register").post(async (req, res) => {
     const {
         fname,
         lname,
@@ -126,8 +121,6 @@ router.route("/RegisterUser").post(async (req, res) => {
         email,
         password
     } = req.body; //email & password from client
-    let saltRounds = await bcrypt.genSalt(10);
-    let hashedPwd = await bcrypt.hash(password, saltRounds)
     let errors = []
     if (!fname) {
         errors.push('fname field is required !!')
@@ -151,7 +144,7 @@ router.route("/RegisterUser").post(async (req, res) => {
         user.findOne({
                 email: email,
             },
-            (err, result) => {
+            async(err, result) => {
                 //find if the email is already exist in the collection
                 if (err) {
                     return res.json({
@@ -159,6 +152,8 @@ router.route("/RegisterUser").post(async (req, res) => {
                     });
                 }
                 if (result == null) {
+                    let saltRounds = await bcrypt.genSalt(10);
+                    let hashedPwd = await bcrypt.hash(password, saltRounds)
                     user.insertOne({
                             fname: fname,
                             lname: lname,
@@ -209,71 +204,56 @@ router.route("/RegisterUser").post(async (req, res) => {
 
 // endpoint to get all leads
 router.route("/leads").get(async (req, res) => {
-  try {
-    let client = await mongoClient.connect(url, {
-                    useNewUrlParser: true,
-                    useUnifiedTopology: true,
-    }); //connect to db
-    let db = client.db("CustomerRelationshipManagement");
-     await db.collection("leads").find().toArray(
-        (err,result) => {
-            if (result) {
-                return res.json({leads: result})
-            } else {
-                return res.json({ message: "no leads found" });
-            }
-    });
-    client.close();
-  } catch (error) {
-    console.log(error);
-    return res.json({ message: "something went wrong" });
-  }
+    try {
+        let client = await mongoClient.connect(url, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        }); //connect to db
+        let db = client.db("CustomerRelationshipManagement");
+        let leads = await db.collection("leads").find({}).toArray();
+        return res.json({leads: leads});
+    } catch (error) {
+        console.log(error);
+        return res.json({
+            message: "something went wrong"
+        });
+    }
 });
 
 // get all services //
 router.route("/services").get(async (req, res) => {
     try {
         let client = await mongoClient.connect(url, {
-                        useNewUrlParser: true,
-                        useUnifiedTopology: true,
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
         }); //connect to db
         let db = client.db("CustomerRelationshipManagement");
-         await db.collection("services").find().toArray(
-            (err,result) => {
-                if (result) {
-                    return res.json({services: result})
-                } else {
-                    return res.json({ message: "no services found" });
-                }
-        });
-        client.close();
-      } catch (error) {
+        let services = await db.collection("services").find({}).toArray();
+        return res.json({services: services});
+    } catch (error) {
         console.log(error);
-        return res.json({ message: "something went wrong" });
-      }
- });
-  
-  // get all contacts / /
- router.route("/contacts").get(async (req, res) => {
+        return res.json({
+            message: "something went wrong"
+        });
+    }
+});
+
+// get all contacts / /
+router.route("/contacts").get(async (req, res) => {
     try {
         let client = await mongoClient.connect(url, {
-                        useNewUrlParser: true,
-                        useUnifiedTopology: true,
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
         }); //connect to db
         let db = client.db("CustomerRelationshipManagement");
-         await db.collection("contacts").find().toArray(
-            (err,result) => {
-                if (result) {
-                    return res.json({services: result})
-                } else {
-                    return res.json({ message: "no contacts found" });
-                }
-        });
-        client.close();
-      } catch (error) {
+        let contacts = await db.collection("contacts").find({}).toArray();
+        return res.json({contacts: contacts});
+    } catch (error) {
         console.log(error);
-        return res.json({ message: "something went wrong" });
-      }
- });
+        return res.json({
+            message: "something went wrong"
+        });
+    }
+});
 
 module.exports = router;

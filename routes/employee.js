@@ -5,11 +5,15 @@ const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const mongodb = require("mongodb");
 const nodemailer = require("nodemailer")
+const jwt = require("jsonwebtoken")
 const mongoClient = mongodb.MongoClient;
+const ObjectId = require('mongodb').ObjectId;
 const {
     EncodeToken
 } = require("../services/jwt");
 require("dotenv").config();
+
+const url = "mongodb+srv://satyaprasadbehara:Fdwe6cYnwFMERYMC@cluster0.efor9.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority";
 
 router.use(cookieParser());
 router.use(bodyParser.json());
@@ -34,81 +38,85 @@ router.route("/login").post(async (req, res) => {
     if (!password) {
         errors.push("password field is required !!");
     }
-    try {
+    if (errors.length === 0) {
         let client = await mongoClient.connect(url, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         }); //connect to db
         let db = client.db("CustomerRelationshipManagement"); //db name
         let user = db.collection("users"); //collection name
-        user.findOne({
+        await user.findOne({
                 email: email,
             },
-            (err, User) => {
+            async (err, User) => {
                 if (err) {
+                    console.log(err);
                     return res.json({
-                        error: "something went wrong",
+                        error: err,
                     });
                 }
                 if (User === null) {
-                    errors.push("No registered user found with " + email);
-                }
-                if (errors.length === 0) {
-                    let usertype = User.userType;
-                    let name = User.fname + " " + User.lname;
-                    if (User.verified == true) {
-                        let passwordMatched = bcrypt.compare(
-                            password,
-                            User.password,
-                            result.password
-                        );
-                        if (passwordMatched == true) {
-                            //if matched
-                            let token = EncodeToken(email);
-                            res
-                                .cookie("jwt", token, {
-                                    maxAge: 1000000,
-                                    // httpOnly: true,
-                                    // secure: true,
-                                })
-                                .cookie("userType", usertype, {
-                                    maxAge: 1000000,
-                                    // httpOnly: true,
-                                    // secure: true,
-                                })
-                                .cookie("user", email, {
-                                    maxAge: 1000000,
-                                    // httpOnly: true,
-                                    // secure: true,
-                                })
-                                .json({
-                                    message: "Hello " + name + " , you are successfully logged in...", //if credentials matched,
+                    return res.json({
+                        error: `No registered user found with ${email}`,
+                    });
+                } else if (User.userType !== "employee") {
+                    return res.json({
+                        error: User.userType +
+                            "  will not have permission to access employee portal",
+                    });
+                } else {
+                    if (User === null) {
+                        return res.json({
+                            message: "No registered user found with " + email,
+                        });
+                    } else {
+                        let usertype = User.userType;
+                        let name = User.fname + " " + User.lname;
+                        if (User.verified === true) {
+                            let passwordMatched = await bcrypt.compare(password, User.password);
+                            if (passwordMatched == true) {
+                                //if matched
+                                let token = EncodeToken(email);
+                                res
+                                    .cookie("jwt", token, {
+                                        maxAge: 1000000,
+                                        // httpOnly: true,
+                                        // secure: true,
+                                    })
+                                    .cookie("userType", usertype, {
+                                        maxAge: 1000000,
+                                        // httpOnly: true,
+                                        // secure: true,
+                                    })
+                                    .cookie("user", User._id, {
+                                        maxAge: 1000000,
+                                        // httpOnly: true,
+                                        // secure: true,
+                                    })
+                                    .json({
+                                        message: "Hello " + name + " , you are successfully logged in...", //if credentials matched,
+                                    });
+                            } else {
+                                return res.json({
+                                    error: "Invalid Credentials..", //if the credentials were not matching
                                 });
+                            }
                         } else {
                             return res.json({
-                                error: "Invalid Credentials..", //if the credentials were not matching
+                                error: "User Identity not verified..",
                             });
                         }
-                    } else {
-                        return res.json({
-                            error: "User Identity not verified..",
-                        });
                     }
-                } else {
-                    return res.json({
-                        error: errors,
-                    });
                 }
             }
         );
-        client.close();
-    } catch (err) {
-        console.log(err);
+    } else {
         return res.json({
-            error: "something went wrong",
+            error: errors,
         });
     }
 });
+
 
 //endpoint for account verification
 router.route("/auth/:token").get((req, res) => {
@@ -239,7 +247,7 @@ router.route("/forgotPassword").get(async (req, res) => {
 });
 
 //for password reset auth
-router.route("/passwordauth/:token").get( (req, res) => {
+router.route("/passwordauth/:token").get((req, res) => {
     const token = req.params.token;
     jwt.verify(token, "abigsecret", async (err, decoded) => {
         if (decoded) {
@@ -346,20 +354,23 @@ router.route("/newPassword").post(async (req, res) => {
 // endpoint to create lead
 router.route("/createLead").post(async (req, res) => {
     const {
-        email,
+        createdBy,
         status,
         contact,
         company
     } = req.body;
-    const {
-        lead
-    } = req.body;
     let errors = [];
-    if (!email) {
-        errors.push("email field is required !!");
+    if (!createdBy) {
+        errors.push("createdBy field is required !!");
     }
-    if (!lead) {
-        errors.push("lead field is required !!");
+    if (!company) {
+        errors.push("company field is required !!");
+    }
+    if (!status) {
+        errors.push("status field is required !!");
+    }
+    if (!contact) {
+        errors.push("contact field is required !!");
     }
     if (errors.length === 0) {
         try {
@@ -371,32 +382,32 @@ router.route("/createLead").post(async (req, res) => {
             let users = db.collection("users")
             let leads = db.collection("leads");
             let admins =
-                users.find({
+                await users.find({
                     userType: "admin",
                 })
-                .toArray((err, mailIds) => {
-                    if (err) {
-                        return "";
-                    } else {
-                        return mailIds;
-                    }
-                });
+                .toArray();
             let managers =
-                users.findOne({
+                await users.find({
                     userType: "manager",
                 })
-                .toArray((err, user) => {
-                    if (err) {
-                        return "";
-                    } else {
-                        return user.email;
-                    }
-                });
-            let sendto = [...admins, ...managers];
-            let mails = sendto.length || ["dvsav@xzvkbxc.com"];
-            console.log(mails);
+                .toArray();
+            let adminsMails = []
+            let managersMails = []
+            if (admins.length) {
+                admins.forEach(admin => {
+                    adminsMails.push(admin.email);
+                })
+            }
+            if (managers.length) {
+                managers.forEach(manager => {
+                    managersMails.push(manager.email);
+                })
+            }
+            let isAdminMailsUndefined = adminsMails || ["satyaprasadbehara@gmail.com"]
+            let isManagersMailsUndefined = managersMails || ["satyaplanet1@gmail.com"]
+            let sendto = [...isAdminMailsUndefined, ...isManagersMailsUndefined];
             leads.insertOne({
-                    createdBy: email,
+                    createdBy: createdBy,
                     company: company,
                     status: status,
                     contact: contact,
@@ -407,9 +418,9 @@ router.route("/createLead").post(async (req, res) => {
                     if (result) {
                         let mailOptions = {
                             from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
-                            to: `${email}`,
-                            subject: "New Lead by" + email,
-                            html: `Hello, ,<br /> New lead has been created by` + email,
+                            to: sendto,
+                            subject: "New Lead alert",
+                            html: `Hello, ,<br /> New lead has been created by` + createdBy,
                         };
                         transporter.sendMail(mailOptions, function (error, info) {
                             if (error) {
@@ -423,7 +434,6 @@ router.route("/createLead").post(async (req, res) => {
                     }
                 }
             );
-            client.close();
         } catch (error) {
             console.log(error);
             return res.json({
@@ -453,19 +463,13 @@ router.route("/getLeads").get(async (req, res) => {
                 useUnifiedTopology: true,
             });
             let db = client.db("CustomerRelationshipManagement");
-            let leads = db.collection("leads");
-            leads.find({
-                    email: email,
-                })
-                .toArray((err, result) => {
-                    if (err) throw err;
-                    if (result) {
-                        return res.json({
-                            result,
-                        });
-                    }
-                });
-            client.close();
+            let leads = await db.collection("leads").find({
+                createdBy: email
+            }).toArray();
+            let allleads = leads || 'no contacts found..'
+            return res.json({
+                leads: allleads
+            });
         } catch (error) {
             console.log(error);
             return res.json({
@@ -478,7 +482,7 @@ router.route("/getLeads").get(async (req, res) => {
 // endpoints to update leads
 router.route("/updateLead").put(async (req, res) => {
     const {
-        email,
+        Updatedby,
         status,
         contact,
         company,
@@ -488,14 +492,14 @@ router.route("/updateLead").put(async (req, res) => {
         errors.push('id field is required !!')
     }
     let errors = []
-    if (!email) {
-        errors.push('email field is required !!')
+    if (!Updatedby) {
+        errors.push('Updatedby field is required !!')
     }
     if (!status) {
         errors.push('status field is required !!')
     }
     if (!contact) {
-        errors.push('contact field is required !!')
+        errors.push('company field is required !!')
     }
     if (!company) {
         errors.push('contact field is required !!')
@@ -508,28 +512,28 @@ router.route("/updateLead").put(async (req, res) => {
                 useUnifiedTopology: true,
             });
             let db = client.db("CustomerRelationshipManagement");
+            let o_id = new ObjectId(id);
             await db.collection("leads").updateOne({
-                _id: objectId(id),
+                _id: o_id,
             }, {
                 $set: {
                     company: company,
                     status: status,
                     contact: contact,
                     updatedAt: new Date(),
-                    Updatedby: email
+                    Updatedby: Updatedby
                 },
             }, (err, result) => {
                 if (result) {
                     return res.json({
                         message: "lead updated successfully.."
                     });
-                } else if (!result.length) {
+                } else {
                     return res.json({
-                        message: "no leads were found with " + email,
+                        message: "no leads were found with " + Updatedby,
                     });
                 }
             });
-            client.close();
         } catch (error) {
             console.log(error);
             return res.json({
@@ -545,15 +549,19 @@ router.route("/updateLead").put(async (req, res) => {
 
 // endpoint to create service
 router.route("/createService").post(async (req, res) => {
+    let jwtcookie = req.cookies.jwt
     const {
-        email,
+        createdBy,
         status,
         contact,
         company
     } = req.body;
     let errors = []
-    if (!email) {
+    if (!createdBy) {
         errors.push('email field is required !!')
+    }
+    if (!jwtcookie) {
+        errors.push('unauthorized request');
     }
     if (!status) {
         errors.push('status field is required !!')
@@ -566,6 +574,8 @@ router.route("/createService").post(async (req, res) => {
     }
     if (errors.length === 0) {
         try {
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
             let client = await mongoClient.connect(url, {
                 useNewUrlParser: true,
                 useUnifiedTopology: true
@@ -574,35 +584,37 @@ router.route("/createService").post(async (req, res) => {
             let services = db.collection("services");
             let users = db.collection("users")
             let admins =
-                users.find({
+                await users.find({
                     userType: "admin",
                 })
-                .toArray((err, mailIds) => {
-                    if (err) {
-                        return "";
-                    } else {
-                        return mailIds;
-                    }
-                });
+                .toArray();
             let managers =
-                users.findOne({
+                await users.find({
                     userType: "manager",
                 })
-                .toArray((err, user) => {
-                    if (err) {
-                        return "";
-                    } else {
-                        return user.email;
-                    }
-                });
-            let sendto = [...admins, ...managers];
-            let mails = sendto.length || ["dvsav@xzvkbxc.com"];
-            console.log(mails);
+                .toArray();
+            console.log(managers)
+            let adminsMails = []
+            let managersMails = []
+            if (admins.length) {
+                admins.forEach(admin => {
+                    adminsMails.push(admin.email);
+                })
+            }
+            if (managers.length) {
+                managers.forEach(manager => {
+                    managersMails.push(manager.email);
+                })
+            }
+            let isAdminMailsUndefined = adminsMails || ["satyaprasadbehara@gmail.com"]
+            let isManagersMailsUndefined = managersMails || ["satyaplanet1@gmail.com"]
+            let sendto = [...isAdminMailsUndefined, ...isManagersMailsUndefined];
+            // console.log(sendto);
             services.insertOne({
                     company: company,
                     createdAt: new Date(),
                     status: status,
-                    createdBy: email,
+                    createdBy: createdBy,
                     contact: contact,
                 },
                 (err, result) => {
@@ -610,9 +622,9 @@ router.route("/createService").post(async (req, res) => {
                     if (result) {
                         let mailOptions = {
                             from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
-                            to: `${email}`,
-                            subject: "New Service by" + email,
-                            html: `Hello,<br /> New Service had been created by` + email,
+                            to: sendto,
+                            subject: "New Service alert",
+                            html: `Hello,<br /> New Service had been created by` + createdBy,
                         };
                         transporter.sendMail(mailOptions, (error, info) => {
                             if (error) {
@@ -626,7 +638,6 @@ router.route("/createService").post(async (req, res) => {
                     }
                 }
             );
-            client.close();
         } catch (error) {
             console.log(error);
             return res.json({
@@ -656,28 +667,17 @@ router.route("/getServices").get(async (req, res) => {
                 useUnifiedTopology: true,
             }); //connect to db
             let db = client.db("CustomerRelationshipManagement");
-            await db
-                .collection("services")
-                .find({
-                    email: email
-                })
-                .toArray(
-                    (err, res) => {
-                        if (result) {
-                            return res.json({
-                                services: result
-                            });
-                        } else {
-                            return res.json({
-                                message: "no services found"
-                            });
-                        }
-                    });
-            client.close();
+            let services = await db.collection("services").find({
+                createdBy: email
+            }).toArray();
+            let allservices = services || 'no services found..'
+            return res.json({
+                services: allservices
+            });
         } catch (error) {
             console.log(error);
             return res.json({
-                error: "something went wrong"
+                message: "something went wrong"
             });
         }
     }
@@ -686,12 +686,13 @@ router.route("/getServices").get(async (req, res) => {
 // endpoint to update services
 router.route("/updateService").put(async (req, res) => {
     const {
-        email,
+        Updatedby,
         status,
         contact,
         company,
         id
     } = req.body;
+    let errors = []
     if (!id) {
         errors.push('id field is required !!')
     }
@@ -704,7 +705,7 @@ router.route("/updateService").put(async (req, res) => {
     if (!company) {
         errors.push('id field is required !!')
     }
-    if (!email) {
+    if (!Updatedby) {
         errors.push('id field is required !!')
     }
     if (errors.length === 0) {
@@ -713,39 +714,36 @@ router.route("/updateService").put(async (req, res) => {
                 useNewUrlParser: true,
                 useUnifiedTopology: true,
             }); //connect to db
-            let db = client.db("crm");
-            let result = await db.collection("users").findOne({
-                email: req.body.email,
-            });
+            let db = client.db("CustomerRelationshipManagement");
+            let o_id = new ObjectId(id);
             await db.collection("services").updateOne({
-                _id: objectId(id),
+                _id: o_id,
             }, {
                 $set: {
                     company: company,
                     status: status,
-                    createdBy: email,
+                    Updatedby: Updatedby,
                     contact: contact,
-                    createdAt: new Date()
+                    Updatedat: new Date()
                 },
             }, (err, result) => {
+                console.log(err)
                 if (result) {
                     return res.json({
                         message: "service updated successfully.."
                     });
-                } else if (!result.length) {
+                } else {
                     return res.json({
                         message: "no services were found with " + email,
                     });
                 }
             });
-            client.close();
         } catch (error) {
             console.log(error);
             return res.json({
                 error: 'something went wrong'
             })
         }
-        client.close();
     } else {
         return res.json({
             error: errors
@@ -756,23 +754,23 @@ router.route("/updateService").put(async (req, res) => {
 // endpoint to create contact
 router.route("/createContact").post(async (req, res) => {
     const {
-        email,
+        createdBy,
         status,
         contact,
         name
     } = req.body;
     let errors = [];
     if (!status) {
-        errors.push('id field is required !!')
+        errors.push('status field is required !!')
     }
     if (!contact) {
         errors.push('id field is required !!')
     }
     if (!name) {
-        errors.push('id field is required !!')
+        errors.push('name field is required !!')
     }
-    if (!email) {
-        errors.push('id field is required !!')
+    if (!createdBy) {
+        errors.push('createdBy field is required !!')
     }
     if (errors.length === 0) {
         try {
@@ -780,9 +778,9 @@ router.route("/createContact").post(async (req, res) => {
                 useNewUrlParser: true,
                 useUnifiedTopology: true,
             }); //connect
-            let db = clientInfo.db("CustomerRelationshipManagement");
+            let db = client.db("CustomerRelationshipManagement");
             await db.collection("contacts").insertOne({
-                createdBy: email,
+                createdBy: createdBy,
                 status: status,
                 contact: contact,
                 name: name,
@@ -800,7 +798,6 @@ router.route("/createContact").post(async (req, res) => {
 
                 }
             });
-            client.close();
         } catch (error) {
             console.log(error);
             return res.json({
@@ -831,25 +828,13 @@ router.route("/getContact").get(async (req, res) => {
                 useUnifiedTopology: true,
             }); //connect to db
             let db = client.db("CustomerRelationshipManagement");
-            await db
-                .collection("contacts")
-                .find({
-                    email: email
-                })
-                .toArray(
-                    (err, result) => {
-                        if (result) {
-                            return res.json({
-                                result
-                            });
-                        } else if (!result.length) {
-                            return res.json({
-                                result: "no contacts were found with " + email,
-                            });
-                        }
-                    }
-                );
-            client.close();
+            let contacts = await db.collection("contacts").find({
+                createdBy: email
+            }).toArray();
+            let allcontacts = contacts || 'no contacts found..'
+            return res.json({
+                contacts: allcontacts
+            });
         } catch (error) {
             console.log(error);
             return res.json({
@@ -860,9 +845,9 @@ router.route("/getContact").get(async (req, res) => {
 });
 
 //  endpoint to update contacts
-router.route("/updateContact").put( async (req, res) => {
+router.route("/updateContact").put(async (req, res) => {
     const {
-        email,
+        Updatedby,
         status,
         contact,
         name,
@@ -878,44 +863,41 @@ router.route("/updateContact").put( async (req, res) => {
     if (!name) {
         errors.push('id field is required !!')
     }
-    if (!email) {
+    if (!Updatedby) {
         errors.push('id field is required !!')
     }
     if (!id) {
         errors.push('id field is required !!')
     }
     if (errors.length === 0) {
-
         try {
             let client = await mongoClient.connect(url, {
                 useNewUrlParser: true,
                 useUnifiedTopology: true,
             }); //connect to db
             let db = client.db("CustomerRelationshipManagement");
-
-            let result = await db.collection("contacts").updateOne({
-                _id: objectId(id),
+            let o_id = new ObjectId(id);
+            db.collection("contacts").updateOne({
+                _id: o_id
             }, {
                 $set: {
-                    email: email,
+                    Updatedby: Updatedby,
                     status: status,
                     contact: contact,
                     name: name,
                     updatedAt: new Date(),
                 },
+            }, (err, result) => {
+                if (result) {
+                    return res.json({
+                        message: "Contact updated successfully...",
+                    });
+                } else {
+                    return res.json({
+                        error: 'no contacts found'
+                    })
+                }
             });
-
-            if (result) {
-                res.status(200).json({
-                    message: "Contact updated",
-                    result,
-                });
-            } else if (!result.length) {
-                res.status(200).json({
-                    message: "no contact found",
-                });
-            }
-            client.close();
         } catch (error) {
             console.log(error);
             return res.json({

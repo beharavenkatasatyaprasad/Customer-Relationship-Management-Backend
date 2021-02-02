@@ -117,251 +117,17 @@ router.route("/login").post(async (req, res) => {
     }
 });
 
-
-//endpoint for account verification
-router.route("/auth/:token").get((req, res) => {
-    const token = req.params.token;
-    try {
-        jwt.verify(token, "abigsecret", async function (err, decoded) {
-            if (decoded) {
-                let client = await mongoClient.connect(url, {
-                    useNewUrlParser: true,
-                    useUnifiedTopology: true,
-                });
-                let db = client.db("CustomerRelationshipManagement"); //db name
-                let user = db.collection("users"); //collection name
-                user.findOneAndUpdate({
-                        email: decoded.email,
-                    }, {
-                        $set: {
-                            verified: true,
-                        },
-                    },
-                    (err, result) => {
-                        if (err) {
-                            return res.json({
-                                error: err,
-                            });
-                        }
-                        if (result) {
-                            return res.json({
-                                message: "Account verification successful...",
-                            });
-                        }
-                    }
-                );
-            }
-            if (err) {
-                return res.json({
-                    error: "Link has expired",
-                }); //if the token expired send this status
-            }
-        });
-        client.close();
-    } catch (err) {
-        console.log(err);
-        return res.json({
-            error: "something went wrong",
-        });
-    }
-});
-
-//Endpoint for password reset request
-router.route("/forgotPassword").get(async (req, res) => {
-    const {
-        email
-    } = req.body; //email from client
-    let errors = [];
-    if (!email) {
-        errors.push("email field is required !!");
-    }
-    if (errors.length === 0) {
-        try {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            }); //connect to db
-            let db = client.db("CustomerRelationshipManagement"); //db name
-            let user = db.collection("users"); //collection name
-            user.findOne({
-                    //find if the email exist in the collection
-                    email: email,
-                },
-                (err, users) => {
-                    if (users == null) {
-                        return res.json({
-                            message: "No registered user found with " + email,
-                        }); //! if not found send this status
-                    } else {
-                        //if found
-                        let emailToken = encodeToken(email);
-                        user.findOneAndUpdate({
-                            email: email,
-                        }, {
-                            $set: {
-                                verified: false,
-                                confirmed: false,
-                            },
-                        });
-                        let Tokenurl = `http://localhost:3000/passwordauth/${emailToken}`;
-                        let name = `${email.split("@")[0]}`;
-                        //email template for sending token
-                        var mailOptions = {
-                            from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
-                            to: `${email}`,
-                            subject: "Password Reset Link",
-                            html: `Hello ${name} ,<br> Here's your password reset link: <a style="color:green" href="${Tokenurl}">Click Here To Reset</a> Link expires in 10 minutes...`,
-                        };
-
-                        //Send the mail
-                        transporter.sendMail(mailOptions, function (error, info) {
-                            if (error) {
-                                return res.json({
-                                    message: error,
-                                });
-                            } else {
-                                return res.json({
-                                    message: "Check your mail and Confirm Identity for resetting password...",
-                                }); //* if mail sent send this msg
-                            }
-                        });
-                    }
-                    if (err) {
-                        return res.json({
-                            message: err,
-                        }); //! if found any error send this status
-                    }
-                }
-            );
-        } catch (err) {
-            console.error(err);
-            return res.json({
-                error: "something went wrong..",
-            });
-        }
-    } else {
-        return res.json({
-            error: errors,
-        });
-    }
-});
-
-//for password reset auth
-router.route("/passwordauth/:token").get((req, res) => {
-    const token = req.params.token;
-    jwt.verify(token, "abigsecret", async (err, decoded) => {
-        if (decoded) {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            });
-            let db = client.db("CustomerRelationshipManagement"); //db name
-            let user = db.collection("users"); //collection name
-            user.findOneAndUpdate({
-                    email: decoded.email,
-                }, {
-                    $set: {
-                        confirmed: true,
-                        verified: false,
-                    },
-                },
-                (err, result) => {
-                    if (err) {
-                        return res.json({
-                            message: err,
-                        });
-                    }
-                    if (result) {
-                        return res.json({
-                            message: "Your account is authorized to Password Reset, please go to /NewPassword endpoint and reset your password..",
-                        });
-                    }
-                }
-            );
-        }
-        if (err) {
-            return res.json({
-                message: err,
-            }); //if the token expired send this status
-        }
-    });
-});
-
-//Endpoint fot setting new password
-router.route("/newPassword").post(async (req, res) => {
-    let errors = [];
-    const {
-        email,
-        newpassword
-    } = req.body; //email & newpassword from client
-    if (!email) {
-        errors.push(`email field is required !!`);
-    }
-    if (!newpassword) {
-        errors.push(`newpassword field is required !!`);
-    }
-    if (errors.length === 0) {
-        let client = await mongoClient.connect(url, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        }); //connect to db
-        let db = client.db("CustomerRelationshipManagement"); //db name
-        let user = db.collection("users"); //collection name
-        user.findOne({
-                email: email,
-            },
-            (err, User) => {
-                if (User == null) {
-                    return res.json({
-                        error: "No User found with " + email + " !!",
-                    }); //! if not found send this status
-                } else {
-                    let token = User.confirmed; //find if the token exists in the collection
-                    if (token == true) {
-                        try {
-                            bcrypt.hash(newpassword, saltRounds, function (err, hash) {
-                                //hash the new password
-                                user.findOneAndUpdate({
-                                    email: email,
-                                }, {
-                                    $set: {
-                                        password: hash, //and set the new hashed password in the db
-                                        confirmed: false,
-                                        verified: true,
-                                    },
-                                });
-                            });
-                            return res.json({
-                                message: "Password reset Successful",
-                            }); //*if done send this status
-                        } catch (err) {
-                            return res.json({
-                                error: err,
-                            }); //! if any error send this status
-                        }
-                    }
-                }
-            }
-        );
-    } else {
-        return res.json({
-            error: errors,
-        });
-    }
-    db.close();
-});
-
 // endpoint to create lead
 router.route("/createLead").post(async (req, res) => {
+    let jwtcookie = req.cookies.jwt
     const {
-        createdBy,
         status,
         contact,
         company
     } = req.body;
     let errors = [];
-    if (!createdBy) {
-        errors.push("createdBy field is required !!");
+    if (!jwtcookie) {
+        errors.push('unauthorized request');
     }
     if (!company) {
         errors.push("company field is required !!");
@@ -374,66 +140,74 @@ router.route("/createLead").post(async (req, res) => {
     }
     if (errors.length === 0) {
         try {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            });
-            let db = client.db("CustomerRelationshipManagement");
-            let users = db.collection("users")
-            let leads = db.collection("leads");
-            let admins =
-                await users.find({
-                    userType: "admin",
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res.json({
+                    error: 'Login to continue..'
                 })
-                .toArray();
-            let managers =
-                await users.find({
-                    userType: "manager",
-                })
-                .toArray();
-            let adminsMails = []
-            let managersMails = []
-            if (admins.length) {
-                admins.forEach(admin => {
-                    adminsMails.push(admin.email);
-                })
-            }
-            if (managers.length) {
-                managers.forEach(manager => {
-                    managersMails.push(manager.email);
-                })
-            }
-            let isAdminMailsUndefined = adminsMails || ["satyaprasadbehara@gmail.com"]
-            let isManagersMailsUndefined = managersMails || ["satyaplanet1@gmail.com"]
-            let sendto = [...isAdminMailsUndefined, ...isManagersMailsUndefined];
-            leads.insertOne({
-                    createdBy: createdBy,
-                    company: company,
-                    status: status,
-                    contact: contact,
-                    createdAt: new Date()
-                },
-                (err, result) => {
-                    if (err) console.log(err);
-                    if (result) {
-                        let mailOptions = {
-                            from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
-                            to: sendto,
-                            subject: "New Lead alert",
-                            html: `Hello, ,<br /> New lead has been created by` + createdBy,
-                        };
-                        transporter.sendMail(mailOptions, function (error, info) {
-                            if (error) {
-                                console.log(error);
-                            } else {
-                                return res.json({
-                                    message: "Lead successfully created..",
-                                }); //* if mail sent send this msg
-                            }
-                        });
-                    }
+            } else {
+                let client = await mongoClient.connect(url, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                });
+                let db = client.db("CustomerRelationshipManagement");
+                let users = db.collection("users")
+                let leads = db.collection("leads");
+                let admins =
+                    await users.find({
+                        userType: "admin",
+                    })
+                    .toArray();
+                let managers =
+                    await users.find({
+                        userType: "manager",
+                    })
+                    .toArray();
+                let adminsMails = []
+                let managersMails = []
+                if (admins.length) {
+                    admins.forEach(admin => {
+                        adminsMails.push(admin.email);
+                    })
                 }
-            );
+                if (managers.length) {
+                    managers.forEach(manager => {
+                        managersMails.push(manager.email);
+                    })
+                }
+                let isAdminMailsUndefined = adminsMails || ["satyaprasadbehara@gmail.com"]
+                let isManagersMailsUndefined = managersMails || ["satyaplanet1@gmail.com"]
+                let sendto = [...isAdminMailsUndefined, ...isManagersMailsUndefined];
+                leads.insertOne({
+                        createdBy: email,
+                        company: company,
+                        status: status,
+                        contact: contact,
+                        createdAt: new Date()
+                    },
+                    (err, result) => {
+                        if (err) console.log(err);
+                        if (result) {
+                            let mailOptions = {
+                                from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
+                                to: sendto,
+                                subject: "New Lead alert",
+                                html: `Hello, ,<br /> New lead has been created by` + email,
+                            };
+                            transporter.sendMail(mailOptions, function (error, info) {
+                                if (error) {
+                                    console.log(error);
+                                } else {
+                                    return res.json({
+                                        message: "Lead successfully created..",
+                                    }); //* if mail sent send this msg
+                                }
+                            });
+                        }
+                    }
+                );
+            }
         } catch (error) {
             console.log(error);
             return res.json({
@@ -449,27 +223,33 @@ router.route("/createLead").post(async (req, res) => {
 
 //end point to fetch lead 
 router.route("/getLeads").get(async (req, res) => {
-    let {
-        email
-    } = req.body;
-    if (!email) {
+    let jwtcookie = req.cookies.jwt
+    if (!jwtcookie) {
         return res.json({
-            message: "email field is required !!",
+            message: "Login to continue..",
         });
     } else {
         try {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            });
-            let db = client.db("CustomerRelationshipManagement");
-            let leads = await db.collection("leads").find({
-                createdBy: email
-            }).toArray();
-            let allleads = leads || 'no contacts found..'
-            return res.json({
-                leads: allleads
-            });
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res.json({
+                    error: 'Login to continue..'
+                })
+            } else {
+                let client = await mongoClient.connect(url, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                });
+                let db = client.db("CustomerRelationshipManagement");
+                let leads = await db.collection("leads").find({
+                    createdBy: email
+                }).toArray();
+                let allleads = leads || 'no leads were found..'
+                return res.json({
+                    leads: allleads
+                });
+            }
         } catch (error) {
             console.log(error);
             return res.json({
@@ -481,19 +261,19 @@ router.route("/getLeads").get(async (req, res) => {
 
 // endpoints to update leads
 router.route("/updateLead").put(async (req, res) => {
+    let jwtcookie = req.cookies.jwt
     const {
-        Updatedby,
         status,
         contact,
         company,
         id
     } = req.body;
+    let errors = []
     if (!id) {
         errors.push('id field is required !!')
     }
-    let errors = []
-    if (!Updatedby) {
-        errors.push('Updatedby field is required !!')
+    if (!jwtcookie) {
+        errors.push('unauthorized request');
     }
     if (!status) {
         errors.push('status field is required !!')
@@ -507,33 +287,41 @@ router.route("/updateLead").put(async (req, res) => {
     if (errors.length === 0) {
 
         try {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            });
-            let db = client.db("CustomerRelationshipManagement");
-            let o_id = new ObjectId(id);
-            await db.collection("leads").updateOne({
-                _id: o_id,
-            }, {
-                $set: {
-                    company: company,
-                    status: status,
-                    contact: contact,
-                    updatedAt: new Date(),
-                    Updatedby: Updatedby
-                },
-            }, (err, result) => {
-                if (result) {
-                    return res.json({
-                        message: "lead updated successfully.."
-                    });
-                } else {
-                    return res.json({
-                        message: "no leads were found with " + Updatedby,
-                    });
-                }
-            });
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res, json({
+                    error: 'login to continue..'
+                })
+            } else {
+                let client = await mongoClient.connect(url, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                });
+                let db = client.db("CustomerRelationshipManagement");
+                let o_id = new ObjectId(id);
+                await db.collection("leads").updateOne({
+                    _id: o_id,
+                }, {
+                    $set: {
+                        company: company,
+                        status: status,
+                        contact: contact,
+                        updatedAt: new Date(),
+                        Updatedby: email
+                    },
+                }, (err, result) => {
+                    if (result) {
+                        return res.json({
+                            message: "lead updated successfully.."
+                        });
+                    } else {
+                        return res.json({
+                            message: "no leads were found with " + email,
+                        });
+                    }
+                });
+            }
         } catch (error) {
             console.log(error);
             return res.json({
@@ -551,15 +339,11 @@ router.route("/updateLead").put(async (req, res) => {
 router.route("/createService").post(async (req, res) => {
     let jwtcookie = req.cookies.jwt
     const {
-        createdBy,
         status,
         contact,
         company
     } = req.body;
     let errors = []
-    if (!createdBy) {
-        errors.push('email field is required !!')
-    }
     if (!jwtcookie) {
         errors.push('unauthorized request');
     }
@@ -593,7 +377,6 @@ router.route("/createService").post(async (req, res) => {
                     userType: "manager",
                 })
                 .toArray();
-            console.log(managers)
             let adminsMails = []
             let managersMails = []
             if (admins.length) {
@@ -614,7 +397,7 @@ router.route("/createService").post(async (req, res) => {
                     company: company,
                     createdAt: new Date(),
                     status: status,
-                    createdBy: createdBy,
+                    createdBy: email,
                     contact: contact,
                 },
                 (err, result) => {
@@ -624,7 +407,7 @@ router.route("/createService").post(async (req, res) => {
                             from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
                             to: sendto,
                             subject: "New Service alert",
-                            html: `Hello,<br /> New Service had been created by` + createdBy,
+                            html: `Hello,<br /> New Service had been created by` + email,
                         };
                         transporter.sendMail(mailOptions, (error, info) => {
                             if (error) {
@@ -653,31 +436,37 @@ router.route("/createService").post(async (req, res) => {
 
 // endpoint to get services info
 router.route("/getServices").get(async (req, res) => {
-    let {
-        email
-    } = req.body
-    if (!email) {
+    let jwtcookie = req.cookies.jwt
+    if (!jwtcookie) {
         return res.json({
-            message: "email field is required !!"
-        })
+            message: "Login to continue..",
+        });
     } else {
         try {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            }); //connect to db
-            let db = client.db("CustomerRelationshipManagement");
-            let services = await db.collection("services").find({
-                createdBy: email
-            }).toArray();
-            let allservices = services || 'no services found..'
-            return res.json({
-                services: allservices
-            });
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res.json({
+                    error: 'Login to continue..'
+                })
+            } else {
+                let client = await mongoClient.connect(url, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                });
+                let db = client.db("CustomerRelationshipManagement");
+                let services = await db.collection("services").find({
+                    createdBy: email
+                }).toArray();
+                let allservices = services || 'no services found..'
+                return res.json({
+                    services: allservices
+                });
+            }
         } catch (error) {
             console.log(error);
             return res.json({
-                message: "something went wrong"
+                error: "something went wrong",
             });
         }
     }
@@ -685,8 +474,8 @@ router.route("/getServices").get(async (req, res) => {
 
 // endpoint to update services
 router.route("/updateService").put(async (req, res) => {
+    let jwtcookie = req.cookies.jwt
     const {
-        Updatedby,
         status,
         contact,
         company,
@@ -696,48 +485,56 @@ router.route("/updateService").put(async (req, res) => {
     if (!id) {
         errors.push('id field is required !!')
     }
+    if (!jwtcookie) {
+        errors.push('unauthorized request');
+    }
     if (!status) {
-        errors.push('id field is required !!')
+        errors.push('status field is required !!')
     }
     if (!contact) {
-        errors.push('id field is required !!')
+        errors.push('company field is required !!')
     }
     if (!company) {
-        errors.push('id field is required !!')
-    }
-    if (!Updatedby) {
-        errors.push('id field is required !!')
+        errors.push('contact field is required !!')
     }
     if (errors.length === 0) {
+
         try {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            }); //connect to db
-            let db = client.db("CustomerRelationshipManagement");
-            let o_id = new ObjectId(id);
-            await db.collection("services").updateOne({
-                _id: o_id,
-            }, {
-                $set: {
-                    company: company,
-                    status: status,
-                    Updatedby: Updatedby,
-                    contact: contact,
-                    Updatedat: new Date()
-                },
-            }, (err, result) => {
-                console.log(err)
-                if (result) {
-                    return res.json({
-                        message: "service updated successfully.."
-                    });
-                } else {
-                    return res.json({
-                        message: "no services were found with " + email,
-                    });
-                }
-            });
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res, json({
+                    error: 'login to continue..'
+                })
+            } else {
+                let client = await mongoClient.connect(url, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                });
+                let db = client.db("CustomerRelationshipManagement");
+                let o_id = new ObjectId(id);
+                await db.collection("services").updateOne({
+                    email: o_id,
+                }, {
+                    $set: {
+                        company: company,
+                        status: status,
+                        contact: contact,
+                        updatedAt: new Date(),
+                        Updatedby: email
+                    },
+                }, (err, result) => {
+                    if (result) {
+                        return res.json({
+                            message: "service updated successfully.."
+                        });
+                    } else {
+                        return res.json({
+                            message: "no services were found",
+                        });
+                    }
+                });
+            }
         } catch (error) {
             console.log(error);
             return res.json({
@@ -746,13 +543,14 @@ router.route("/updateService").put(async (req, res) => {
         }
     } else {
         return res.json({
-            error: errors
+            errors: errors
         })
     }
 });
 
 // endpoint to create contact
 router.route("/createContact").post(async (req, res) => {
+    let jwtcookie = req.cookies.jwt
     const {
         createdBy,
         status,
@@ -763,24 +561,32 @@ router.route("/createContact").post(async (req, res) => {
     if (!status) {
         errors.push('status field is required !!')
     }
+    if (!jwtcookie) {
+        errors.push('unauthorized request');
+    }
     if (!contact) {
         errors.push('id field is required !!')
     }
     if (!name) {
         errors.push('name field is required !!')
     }
-    if (!createdBy) {
-        errors.push('createdBy field is required !!')
-    }
     if (errors.length === 0) {
         try {
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res, json({
+                    error: 'login to continue..'
+                })
+            } else {
             let client = await mongoClient.connect(url, {
                 useNewUrlParser: true,
                 useUnifiedTopology: true,
             }); //connect
+            
             let db = client.db("CustomerRelationshipManagement");
             await db.collection("contacts").insertOne({
-                createdBy: createdBy,
+                createdBy: email,
                 status: status,
                 contact: contact,
                 name: name,
@@ -798,7 +604,7 @@ router.route("/createContact").post(async (req, res) => {
 
                 }
             });
-        } catch (error) {
+        }} catch (error) {
             console.log(error);
             return res.json({
                 error: 'something went wrong'
@@ -808,46 +614,51 @@ router.route("/createContact").post(async (req, res) => {
         return res.json({
             errors: errors
         })
-
     }
 });
 
-// endpoint to get contacts
+// endpoint to get contacts by email
 router.route("/getContact").get(async (req, res) => {
-    let {
-        email
-    } = req.body
-    if (!email) {
+    let jwtcookie = req.cookies.jwt
+    if (!jwtcookie) {
         return res.json({
-            error: 'email field is required !!'
-        })
+            message: "Login to continue..",
+        });
     } else {
         try {
-            let client = await mongoClient.connect(url, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-            }); //connect to db
-            let db = client.db("CustomerRelationshipManagement");
-            let contacts = await db.collection("contacts").find({
-                createdBy: email
-            }).toArray();
-            let allcontacts = contacts || 'no contacts found..'
-            return res.json({
-                contacts: allcontacts
-            });
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res.json({
+                    error: 'Login to continue..'
+                })
+            } else {
+                let client = await mongoClient.connect(url, {
+                    useNewUrlParser: true,
+                    useUnifiedTopology: true,
+                });
+                let db = client.db("CustomerRelationshipManagement");
+                let contacts = await db.collection("contacts").find({
+                    createdBy: email
+                }).toArray();
+                let allcontacts = contacts || 'no contacts found..'
+                return res.json({
+                    contacts: allcontacts
+                });
+            }
         } catch (error) {
             console.log(error);
             return res.json({
-                error: 'something went wrong'
-            })
+                error: "something went wrong",
+            });
         }
     }
 });
 
 //  endpoint to update contacts
 router.route("/updateContact").put(async (req, res) => {
+    let jwtcookie = req.cookies.jwt
     const {
-        Updatedby,
         status,
         contact,
         name,
@@ -857,13 +668,13 @@ router.route("/updateContact").put(async (req, res) => {
     if (!status) {
         errors.push('id field is required !!')
     }
+    if (!jwtcookie) {
+        errors.push('unauthorized required')
+    }
     if (!contact) {
         errors.push('id field is required !!')
     }
     if (!name) {
-        errors.push('id field is required !!')
-    }
-    if (!Updatedby) {
         errors.push('id field is required !!')
     }
     if (!id) {
@@ -871,6 +682,13 @@ router.route("/updateContact").put(async (req, res) => {
     }
     if (errors.length === 0) {
         try {
+            let token = jwt.verify(jwtcookie, "abigsecret");
+            let email = token.email;
+            if (!email) {
+                return res.json({
+                    error: 'Login to continue..'
+                })
+            } else {
             let client = await mongoClient.connect(url, {
                 useNewUrlParser: true,
                 useUnifiedTopology: true,
@@ -881,7 +699,7 @@ router.route("/updateContact").put(async (req, res) => {
                 _id: o_id
             }, {
                 $set: {
-                    Updatedby: Updatedby,
+                    Updatedby: email,
                     status: status,
                     contact: contact,
                     name: name,
@@ -898,7 +716,7 @@ router.route("/updateContact").put(async (req, res) => {
                     })
                 }
             });
-        } catch (error) {
+        }} catch (error) {
             console.log(error);
             return res.json({
                 error: "something went wrong",

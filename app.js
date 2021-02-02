@@ -5,6 +5,7 @@ const mongodb = require("mongodb"); //MongoDB driver
 const accessToEmployee = require('./routes/employee');
 const accessToAdmin = require('./routes/admin');
 const accessToManager = require('./routes/manager');
+const verification = require('./routes/verification');
 const mongoClient = mongodb.MongoClient;
 require('dotenv').config()
 app.use(bodyParser.json());
@@ -23,6 +24,7 @@ mongoClient.connect(
     }
 );
 
+app.use('/', verification);
 app.use('/admin', accessToAdmin, accessToManager, accessToEmployee);
 app.use('/manager', accessToManager, accessToEmployee);
 app.use('/employee', accessToEmployee);

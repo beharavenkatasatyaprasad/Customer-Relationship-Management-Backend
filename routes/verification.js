@@ -116,7 +116,7 @@ router.route("/forgotPassword").get(async (req, res) => {
                                 confirmed: false,
                             },
                         });
-                        let Tokenurl = `http://localhost:3000/passwordauth/${emailToken}`;
+                        let Tokenurl = `https://crm-backend-satya.herokuapp.com/passwordauth/${emailToken}`;
                         let name = `${email.split("@")[0]}`;
                         //email template for sending token
                         var mailOptions = {

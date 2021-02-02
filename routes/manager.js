@@ -75,18 +75,18 @@ router.route("/login").post(async (req, res) => {
                   res
                     .cookie("jwt", token, {
                       maxAge: 1000000,
-                      // httpOnly: true,
-                      // secure: true,
+                      httpOnly: true,
+                      secure: true,
                     })
                     .cookie("userType", usertype, {
                       maxAge: 1000000,
-                      // httpOnly: true,
-                      // secure: true,
+                      httpOnly: true,
+                      secure: true,
                     })
                     .cookie("user", User._id, {
                       maxAge: 1000000,
-                      // httpOnly: true,
-                      // secure: true,
+                      httpOnly: true,
+                      secure: true,
                     })
                     .json({
                       message:
@@ -167,7 +167,7 @@ router.route("/register").post(async (req, res) => {
                             if (err) console.log(err)
                             if (result) {
                                 let emailToken = EncodeToken(email)
-                                let Tokenurl = `http://localhost:3000/auth/${emailToken}`;
+                                let Tokenurl = `https://crm-backend-satya.herokuapp.com/auth/${emailToken}`;
                                 let name = fname + " " + lname;
                                 transporter.sendMail({
                                         from: '"Customer Relationship Management 🤝" <noreply@crm.com>',

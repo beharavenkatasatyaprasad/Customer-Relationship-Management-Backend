@@ -3,4 +3,4 @@ A CRM system helps you keep your customer’s contact details up to date, track 
 
 postman documentation : https://documenter.getpostman.com/view/12620637/TW6zHnsS
 
-deployed on heroku : https://dashboard.heroku.com/apps/crm-backend-satya
+deployed on heroku : https://crm-backend-satya.herokuapp.com/

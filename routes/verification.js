@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 const mongodb = require("mongodb");
 const nodemailer = require("nodemailer")
 const jwt = require("jsonwebtoken")
+const fs = require('fs');
 const mongoClient = mongodb.MongoClient;
 const {
     EncodeToken
@@ -24,8 +25,14 @@ const transporter = nodemailer.createTransport({
 });
 
 router.route("/").get(async (req, res) => {
-    res.sendStatus(202);
-    res.end();
+    fs.readFile('./views/index.html',function (err, html) {
+        if (err) {
+            throw err; 
+        }       
+        res.writeHeader(200, {"Content-Type": "text/html"});  
+        res.write(html);  
+        res.end();             
+    })
 })
 //endpoint for account verification
 router.route("/auth/:token").get(async (req, res) => {

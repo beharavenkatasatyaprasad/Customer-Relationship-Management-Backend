@@ -4,7 +4,7 @@ let EncodeToken = (email) => {
    let token = jwt.sign({
             email: email,
         },
-        "abigsecret", {
+        process.env.JWTSECRET, {
             expiresIn: "1h",
         }
     ); 

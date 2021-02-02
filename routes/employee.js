@@ -13,7 +13,8 @@ const {
 } = require("../services/jwt");
 require("dotenv").config();
 
-const url = "mongodb+srv://satyaprasadbehara:Fdwe6cYnwFMERYMC@cluster0.efor9.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority";
+const url =
+  process.env.MONGODB_URL;
 
 router.use(cookieParser());
 router.use(bodyParser.json());
@@ -21,8 +22,8 @@ router.use(bodyParser.json());
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: "mockmail4me@gmail.com",
-        pass: "dnvoerscnkohtwew",
+        user: process.env.USER,
+        pass: process.env.PASS,
     },
 });
 
@@ -140,7 +141,7 @@ router.route("/createLead").post(async (req, res) => {
     }
     if (errors.length === 0) {
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.JWTSECRET);
             let email = token.email;
             if (!email) {
                 return res.json({
@@ -230,7 +231,7 @@ router.route("/getLeads").get(async (req, res) => {
         });
     } else {
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             if (!email) {
                 return res.json({
@@ -287,7 +288,7 @@ router.route("/updateLead").put(async (req, res) => {
     if (errors.length === 0) {
 
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             if (!email) {
                 return res, json({
@@ -358,7 +359,7 @@ router.route("/createService").post(async (req, res) => {
     }
     if (errors.length === 0) {
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             let client = await mongoClient.connect(url, {
                 useNewUrlParser: true,
@@ -443,7 +444,7 @@ router.route("/getServices").get(async (req, res) => {
         });
     } else {
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             if (!email) {
                 return res.json({
@@ -500,7 +501,7 @@ router.route("/updateService").put(async (req, res) => {
     if (errors.length === 0) {
 
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             if (!email) {
                 return res, json({
@@ -572,7 +573,7 @@ router.route("/createContact").post(async (req, res) => {
     }
     if (errors.length === 0) {
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             if (!email) {
                 return res, json({
@@ -626,7 +627,7 @@ router.route("/getContact").get(async (req, res) => {
         });
     } else {
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             if (!email) {
                 return res.json({
@@ -682,7 +683,7 @@ router.route("/updateContact").put(async (req, res) => {
     }
     if (errors.length === 0) {
         try {
-            let token = jwt.verify(jwtcookie, "abigsecret");
+            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
             let email = token.email;
             if (!email) {
                 return res.json({

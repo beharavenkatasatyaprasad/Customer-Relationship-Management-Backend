@@ -10,16 +10,16 @@ const {
     EncodeToken
 } = require("../services/jwt");
 require("dotenv").config();
-const url = "mongodb+srv://satyaprasadbehara:Fdwe6cYnwFMERYMC@cluster0.efor9.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority";
+const url =process.env.MONGODB_URL;
 router.use(cookieParser());
 router.use(bodyParser.json());
 
 const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: "mockmail4me@gmail.com",
-        pass: "dnvoerscnkohtwew",
-    },
+  service: "gmail",
+  auth: {
+      user: process.env.USER,
+      pass: process.env.PASS,
+  },
 });
 
 router.route("/login").post(async (req, res) => {

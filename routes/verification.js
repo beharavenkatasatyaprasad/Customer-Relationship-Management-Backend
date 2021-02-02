@@ -12,15 +12,15 @@ const {
 } = require("../services/jwt");
 require("dotenv").config();
 
-const url = "mongodb+srv://satyaprasadbehara:Fdwe6cYnwFMERYMC@cluster0.efor9.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority";
+const url = process.env.MONGODB_URL ;
 
 router.use(bodyParser.json());
 
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: "mockmail4me@gmail.com",
-        pass: "dnvoerscnkohtwew",
+        user: process.env.USER,
+        pass: process.env.PASS,
     },
 });
 
@@ -38,7 +38,7 @@ router.route("/").get(async (req, res) => {
 router.route("/auth/:token").get(async (req, res) => {
     const token = req.params.token;
     try {
-        let decoded = jwt.verify(token, "abigsecret");
+        let decoded = jwt.verify(token,process.env.JWTSECRET);
         if (decoded) {
             let client = await mongoClient.connect(url, {
                 useNewUrlParser: true,
@@ -162,7 +162,7 @@ router.route("/forgotPassword").get(async (req, res) => {
 //for password reset auth
 router.route("/passwordauth/:token").get(async (req, res) => {
     const token = req.params.token;
-    jwt.verify(token, "abigsecret", async (err, decoded) => {
+    jwt.verify(token, process.env.JWTSECRET, async (err, decoded) => {
         if (decoded) {
             let client = await mongoClient.connect(url, {
                 useNewUrlParser: true,

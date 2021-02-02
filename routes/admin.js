@@ -12,7 +12,7 @@ router.use(cookieParser());
 router.use(bodyParser.json());
 
 const url =
-  "mongodb+srv://satyaprasadbehara:Fdwe6cYnwFMERYMC@cluster0.efor9.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority";
+  process.env.MONGODB_URL;
 
 router.route("/login").post(async (req, res) => {
   const { email, password } = req.body;

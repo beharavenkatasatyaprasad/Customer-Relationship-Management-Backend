@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
+const config = require("../config.json");
 
-let EncodeToken = (email) => {
+let EncodeToken = (email,userType) => {
    let token = jwt.sign({
             email: email,
+            userType:userType
         },
-        process.env.JWTSECRET, {
-            expiresIn: "1h",
+        config.JWTSECRET, {
+            expiresIn: "10h",
         }
     ); 
     return token;

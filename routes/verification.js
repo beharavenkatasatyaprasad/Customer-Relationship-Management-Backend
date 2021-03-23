@@ -78,8 +78,7 @@ router.route("/login").post(async (req, res) => {
                   //if matched
                   let token = EncodeToken(email, usertype);
                   res.status(202).json({
-                    message:
-                      "Hello " + name + " , you are successfully logged in...", //if credentials matched,
+                    user: email, //if credentials matched,
                     token: token,
                     firstname: User.fname,
                     lastname: User.lname,
@@ -87,7 +86,7 @@ router.route("/login").post(async (req, res) => {
                   });
                 } else {
                   return res.json({
-                    message: "Invalid Credentials..", //if the credentials were not matching
+                    error: "Invalid Credentials..", //if the credentials were not matching
                   });
                 }
               } else {

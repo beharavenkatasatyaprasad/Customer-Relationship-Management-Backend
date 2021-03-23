@@ -29,17 +29,22 @@ const transporter = nodemailer.createTransport({
 
 // endpoint to create lead
 router.route("/createLead").post(async (req, res) => {
-    let jwtcookie = req.cookies.jwt
     const {
-        status,
+        name,
+        email,
         contact,
-        company
+        walkingdate,
+        source,
+        status,
+        agent,
+        token,
+        agentemail
     } = req.body;
     let errors = [];
-    if (!jwtcookie) {
+    if (!token) {
         errors.push('unauthorized request');
     }
-    if (!company) {
+    if (!contact) {
         errors.push("company field is required !!");
     }
     if (!status) {
@@ -48,12 +53,24 @@ router.route("/createLead").post(async (req, res) => {
     if (!contact) {
         errors.push("contact field is required !!");
     }
+    if (!source) {
+        errors.push("source field is required !!");
+    }
+    if (!agent) {
+        errors.push("Agent field is required !!");
+    }
+    if (!email) {
+        errors.push("email field is required !!");
+    }
+    if (!name) {
+        errors.push("name field is required !!");
+    }
+    
     if (errors.length === 0) {
         try {
-            let token = jwt.verify(jwtcookie, process.env.JWTSECRET);
-            let email = token.email;
-            if (!email) {
-                return res.json({
+            let Token = jwt.verify(token, config.JWTSECRET);
+            if (!Token.email) {
+                res.status(404).json({
                     error: 'Login to continue..'
                 })
             } else {
@@ -90,11 +107,13 @@ router.route("/createLead").post(async (req, res) => {
                 let isManagersMailsUndefined = managersMails || ["satyaplanet1@gmail.com"]
                 let sendto = [...isAdminMailsUndefined, ...isManagersMailsUndefined];
                 leads.insertOne({
-                        createdBy: email,
-                        company: company,
+                        agent: agent,
+                        name: name,
                         status: status,
                         contact: contact,
-                        createdAt: new Date()
+                        source:source,
+                        walkingdate:walkingdate,
+                        agentemail:agentemail
                     },
                     (err, result) => {
                         if (err) console.log(err);
@@ -103,13 +122,13 @@ router.route("/createLead").post(async (req, res) => {
                                 from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
                                 to: sendto,
                                 subject: "New Lead alert",
-                                html: `Hello, ,<br /> New lead has been created by` + email,
+                                html: `Hello, ,<br /> New lead has been created by ` + Token.email,
                             };
                             transporter.sendMail(mailOptions, function (error, info) {
                                 if (error) {
                                     console.log(error);
                                 } else {
-                                    return res.json({
+                                    res.status(202).json({
                                         message: "Lead successfully created..",
                                     }); //* if mail sent send this msg
                                 }
@@ -120,30 +139,31 @@ router.route("/createLead").post(async (req, res) => {
             }
         } catch (error) {
             console.log(error);
-            return res.json({
+            res.status(501).json(({
                 error: "something went wrong",
-            });
+            }));
         }
     } else {
-        return res.json({
-            error: errors,
+        res.status(404).json({
+            error: errors[0]
         });
     }
 });
 
 //end point to fetch lead 
-router.route("/getLeads").get(async (req, res) => {
-    let jwtcookie = req.cookies.jwt
-    if (!jwtcookie) {
+router.route("/getLeads/:token").get(async (req, res) => {
+    let Token = req.params.token
+    if (!Token) {
         return res.json({
             message: "Login to continue..",
         });
     } else {
         try {
-            let token = jwt.verify(jwtcookie, process.env.jwtsecret);
+            let token = jwt.verify(Token, config.JWTSECRET);
             let email = token.email;
-            if (!email) {
-                return res.json({
+            let role = token.userType;
+            if (!email && role === 'employee') {
+                res.status(404).json({
                     error: 'Login to continue..'
                 })
             } else {
@@ -153,16 +173,17 @@ router.route("/getLeads").get(async (req, res) => {
                 });
                 let db = client.db("CustomerRelationshipManagement");
                 let leads = await db.collection("leads").find({
-                    createdBy: email
+                    agent: email
                 }).toArray();
-                let allleads = leads || 'no leads were found..'
-                return res.json({
+                let allleads = leads || [];
+                
+                res.status(202).json({
                     leads: allleads
                 });
             }
         } catch (error) {
             console.log(error);
-            return res.json({
+            res.status(505).json({
                 error: "something went wrong",
             });
         }

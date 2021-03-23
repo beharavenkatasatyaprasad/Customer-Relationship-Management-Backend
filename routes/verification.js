@@ -63,8 +63,8 @@ router.route("/login").post(async (req, res) => {
             });
           } else {
             if (User === null) {
-              return res.json({
-                message: "No registered user found with " + email,
+              res.status(404).json({
+                error: "No registered user found with " + email,
               });
             } else {
               let usertype = User.userType;

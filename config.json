@@ -1,5 +1,5 @@
 {
-    "mongodburl":"mongodb+srv://satyaprasadbehara:Fdwe6cYnwFMERYMC@cluster0.efor9.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority",
+    "mongodburl":"mongodb+srv://satyabehara:e47u15rJaAHd1N27@cluster0.mdyvh.mongodb.net/CustomerRelationshipManagement?retryWrites=true&w=majority",
     "user":"mockmail4me@gmail.com",
     "pass": "dnvoerscnkohtwew",
     "JWTSECRET":"thebiggesteversecret"

@@ -168,20 +168,31 @@ router.route("/services").get(async (req, res) => {
 });
 
 // get all contacts / /
-router.route("/contacts").get(async (req, res) => {
-  try {
-    let client = await mongoClient.connect(url, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }); //connect to db
-    let db = client.db("CustomerRelationshipManagement");
-    let contacts = await db.collection("contacts").find({}).toArray();
-    return res.json({ contacts: contacts });
-  } catch (error) {
-    console.log(error);
-    return res.json({
-      message: "something went wrong",
-    });
+router.route("/contacts/:token").get(async (req, res) => {
+  let { token } = req.params;
+  let verified = jwt.verify(token, config.JWTSECRET);
+  let email = verified.email;
+  let role = verified.userType;
+  if(email && (role === 'admin' || role === 'manager')){
+    try {
+        let client = await mongoClient.connect(url, {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        }); //connect to db
+        let db = client.db("CustomerRelationshipManagement");
+        let contacts = await db.collection("contacts").find({}).toArray();
+        let allcontacts= contacts || [];
+        res.status(202).json({ contacts: allcontacts });
+      } catch (error) {
+        console.log(error);
+        res.status(501).json({
+          error: "something went wrong",
+        });
+      }
+  }else{
+    res.status(404).json({
+        error: "something went wrong",
+      });
   }
 });
 

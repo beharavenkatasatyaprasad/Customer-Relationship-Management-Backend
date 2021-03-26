@@ -179,7 +179,7 @@ router.route("/getLeads/:token").get(async (req, res) => {
         let leads = await db
           .collection("leads")
           .find({
-            agent: email,
+            agentemail: token.email,
           })
           .toArray();
         let allleads = leads || [];
@@ -385,7 +385,7 @@ router.route("/createService").post(async (req, res) => {
     errors.push("contact field is required !!");
   }
   if (!company) {
-    errors.push("contact field is required !!");
+    errors.push("company field is required !!");
   }
   if (errors.length === 0) {
     try {
@@ -590,56 +590,109 @@ router.route("/updateService").put(async (req, res) => {
 
 // endpoint to create contact
 router.route("/createContact").post(async (req, res) => {
-  let jwtcookie = req.cookies.jwt;
-  const { createdBy, status, contact, name } = req.body;
+  const {
+    name,
+    email,
+    phone,
+    agent,
+    branch,
+    offer,
+    token
+  } = req.body;
   let errors = [];
-  if (!status) {
-    errors.push("status field is required !!");
-  }
-  if (!jwtcookie) {
+  if (!token) {
     errors.push("unauthorized request");
   }
-  if (!contact) {
-    errors.push("id field is required !!");
+  if (!branch) {
+    errors.push("branch field is required !!");
+  }
+  if (!phone) {
+    errors.push("phone field is required !!");
+  }
+  if (!offer) {
+    errors.push("offer field is required !!");
+  }
+  if (!email) {
+    errors.push("email field is required !!");
   }
   if (!name) {
     errors.push("name field is required !!");
   }
+
   if (errors.length === 0) {
     try {
-      let token = jwt.verify(jwtcookie, process.env.jwtsecret);
-      let email = token.email;
-      if (!email) {
-        return (
-          res,
-          json({
-            error: "login to continue..",
-          })
-        );
+      let Token = jwt.verify(token, config.JWTSECRET);
+      if (!Token.email) {
+        res.status(404).json({
+          error: "Login to continue..",
+        });
       } else {
         let client = await mongoClient.connect(url, {
           useNewUrlParser: true,
           useUnifiedTopology: true,
-        }); //connect
-
+        });
         let db = client.db("CustomerRelationshipManagement");
-        await db.collection("contacts").insertOne(
+        let users = db.collection("users");
+        let contacts = db.collection("contacts");
+        let admins = await users
+          .find({
+            userType: "admin",
+          })
+          .toArray();
+        let managers = await users
+          .find({
+            userType: "manager",
+          })
+          .toArray();
+        let adminsMails = [];
+        let managersMails = [];
+        if (admins.length) {
+          admins.forEach((admin) => {
+            adminsMails.push(admin.email);
+          });
+        }
+        if (managers.length) {
+          managers.forEach((manager) => {
+            managersMails.push(manager.email);
+          });
+        }
+        let isAdminMailsUndefined = adminsMails || [
+          "satyaprasadbehara@gmail.com",
+        ];
+        let isManagersMailsUndefined = managersMails || [
+          "satyaplanet1@gmail.com",
+        ];
+        let sendto = [...isAdminMailsUndefined, ...isManagersMailsUndefined];
+        let id = "C" + Math.floor(Math.random() * (999 - 100 + 1) + 100);
+        contacts.insertOne(
           {
-            createdBy: email,
-            status: status,
-            contact: contact,
+            id: id,
             name: name,
-            createdAt: new Date(),
+            branch: branch,
+            phone: phone,
+            agent: agent,
+            email: email,
+            agentemail: Token.email,
+            offer:offer
           },
           (err, result) => {
-            if (err) {
-              return res.json({
-                error: err,
-              });
-            }
+            if (err) console.log(err);
             if (result) {
-              return res.json({
-                message: "contact successfully created !!",
+              let mailOptions = {
+                from: '"Customer Relationship Management 🤝" <noreply@crm.com>',
+                to: sendto,
+                subject: "New Contact alert",
+                html:
+                  `Hello, ,<br /> New Contact has been created by ` + Token.email,
+              };
+              transporter.sendMail(mailOptions, function (error, info) {
+                if (error) {
+                  console.log(error);
+                } else {
+                  res.status(202).json({
+                    message: "Contact successfully created..",
+                  }); 
+                }
               });
             }
           }
@@ -647,30 +700,31 @@ router.route("/createContact").post(async (req, res) => {
       }
     } catch (error) {
       console.log(error);
-      return res.json({
-        error: "something went wrong",
+      res.status(501).json({
+        error: "something went wrong"
       });
     }
   } else {
-    return res.json({
-      errors: errors,
+    res.status(404).json({
+      error: errors[0],
     });
   }
 });
 
 // endpoint to get contacts by email
-router.route("/getContact").get(async (req, res) => {
-  let jwtcookie = req.cookies.jwt;
-  if (!jwtcookie) {
+router.route("/getContact/:token").get(async (req, res) => {
+  let Token = req.params.token;
+  if (!Token) {
     return res.json({
       message: "Login to continue..",
     });
   } else {
     try {
-      let token = jwt.verify(jwtcookie, process.env.jwtsecret);
+      let token = jwt.verify(Token, config.JWTSECRET);
       let email = token.email;
-      if (!email) {
-        return res.json({
+      let role = token.userType;
+      if (!email && role === "employee") {
+        res.status(404).json({
           error: "Login to continue..",
         });
       } else {
@@ -682,17 +736,17 @@ router.route("/getContact").get(async (req, res) => {
         let contacts = await db
           .collection("contacts")
           .find({
-            createdBy: email,
+            agentemail: token.email,
           })
           .toArray();
-        let allcontacts = contacts || "no contacts found..";
-        return res.json({
-          contacts: allcontacts,
+        let allcontacts = contacts || [];
+        res.status(202).json({
+          contacts: allcontacts
         });
       }
     } catch (error) {
       console.log(error);
-      return res.json({
+      res.status(505).json({
         error: "something went wrong",
       });
     }

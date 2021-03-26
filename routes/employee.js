@@ -712,7 +712,7 @@ router.route("/createContact").post(async (req, res) => {
 });
 
 // endpoint to get contacts by email
-router.route("/getContact/:token").get(async (req, res) => {
+router.route("/getContacts/:token").get(async (req, res) => {
   let Token = req.params.token;
   if (!Token) {
     return res.json({
@@ -753,67 +753,164 @@ router.route("/getContact/:token").get(async (req, res) => {
   }
 });
 
+router.route("/getContact/:id/:token").get(async (req, res) => {
+  let { token, id } = req.params;
+  let o_id = new ObjectId(id);
+  if (!token) {
+    return res.json({
+      message: "Login to continue..",
+    });
+  } else {
+    try {
+      let Token = jwt.verify(token, config.JWTSECRET);
+      let email = Token.email;
+      if (!email) {
+        res.status(404).json({
+          error: "Unauthorized login..",
+        });
+      } else {
+        let client = await mongoClient.connect(url, {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        });
+        let db = client.db("CustomerRelationshipManagement");
+        await db.collection("contacts").findOne(
+          {
+            _id: o_id,
+          },
+          async (err, result) => {
+            if (err) throw err;
+            else {
+              res.status(202).json({
+                contact: result,
+              });
+            }
+          }
+        );
+      }
+    } catch (error) {
+      console.log(error);
+      res.status(505).json({
+        error: "something went wrong",
+      });
+    }
+  }
+});
+
 //  endpoint to update contacts
 router.route("/updateContact").put(async (req, res) => {
-  let jwtcookie = req.cookies.jwt;
-  const { status, contact, name, id } = req.body;
+  const {
+    name,
+    email,
+    phone,
+    branch,
+    id,
+    offer,
+    token
+  } = req.body;
   let errors = [];
-  if (!status) {
-    errors.push("id field is required !!");
+  if (!token) {
+    errors.push("unauthorized request");
   }
-  if (!jwtcookie) {
-    errors.push("unauthorized required");
+  if (!branch) {
+    errors.push("branch field is required !!");
   }
-  if (!contact) {
-    errors.push("id field is required !!");
+  if (!phone) {
+    errors.push("phone field is required !!");
+  }
+  if (!offer) {
+    errors.push("offer field is required !!");
+  }
+  if (!email) {
+    errors.push("email field is required !!");
   }
   if (!name) {
-    errors.push("id field is required !!");
+    errors.push("name field is required !!");
   }
-  if (!id) {
-    errors.push("id field is required !!");
-  }
+
   if (errors.length === 0) {
     try {
-      let token = jwt.verify(jwtcookie, process.env.jwtsecret);
-      let email = token.email;
-      if (!email) {
-        return res.json({
+      let Token = jwt.verify(token, config.JWTSECRET);
+      if (!Token.email) {
+        res.status(404).json({
           error: "Login to continue..",
         });
       } else {
         let client = await mongoClient.connect(url, {
           useNewUrlParser: true,
           useUnifiedTopology: true,
-        }); //connect to db
+        });
         let db = client.db("CustomerRelationshipManagement");
         let o_id = new ObjectId(id);
-        db.collection("contacts").updateOne(
+        await db.collection("contacts").updateOne(
           {
             _id: o_id,
           },
           {
             $set: {
-              Updatedby: email,
-              status: status,
-              contact: contact,
               name: name,
-              updatedAt: new Date(),
+              branch: branch,
+              phone: phone,
+              email: email,
+              offer:offer
             },
           },
           (err, result) => {
             if (result) {
-              return res.json({
-                message: "Contact updated successfully...",
+              res.status(202).json({
+                contact: "Contact updated successfully..",
               });
             } else {
-              return res.json({
-                error: "no contacts found",
+              res.status(404).json({
+                error: "no Contact were found with " + id,
               });
             }
           }
         );
       }
+    } catch (error) {
+      console.log(error);
+      res.status(404).json({
+        error: "something went wrong",
+      });
+    }
+  } else {
+    res.status(404).json({
+      errors: errors[0],
+    });
+  }
+});
+
+router.route("/deleteContact/:id").delete(async (req, res) => {
+  let { id } = req.params;
+  let errors = [];
+  if (!id) {
+    errors.push("id field is required !!");
+  }
+  if (errors.length === 0) {
+    try {
+      let client = await mongoClient.connect(url, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      });
+      let db = client.db("CustomerRelationshipManagement");
+      let o_id = new ObjectId(id);
+      await db.collection("contacts").deleteOne(
+        {
+          _id: o_id,
+        },
+        (err, result) => {
+          if (result) {
+            res.status(202).json({
+              message: "contact successfully deleted..",
+            });
+          } else {
+            res.status(404).json({
+              error: "something went wrong",
+            });
+          }
+        }
+      );
     } catch (error) {
       console.log(error);
       return res.json({
@@ -822,7 +919,7 @@ router.route("/updateContact").put(async (req, res) => {
     }
   } else {
     return res.json({
-      error: errors,
+      errors: errors,
     });
   }
 });
